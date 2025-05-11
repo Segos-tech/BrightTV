@@ -1,0 +1,101 @@
+
+SELECT 
+*
+FROM BRIGHT.PUBLIC.USER_PROFILES
+LIMIT 10;
+
+SELECT 
+*
+FROM BRIGHT.PUBLIC.VIEWERSHIP
+LIMIT 10;
+
+SELECT 
+* 
+FROM USER_PROFILES AS U
+FULL OUTER JOIN VIEWERSHIP AS V
+ON U.userid = V.userid;
+
+SELECT
+    COALESCE(gender, 'Unknown') AS Gender,
+    COALESCE(race, 'Unknown') AS Race,
+    COALESCE(province, 'Unknown') AS Province,
+    COUNT(*) AS user_count
+FROM BrightLight_TV
+GROUP BY Gender, Race,Province
+ORDER BY user_count DESC;
+
+CREATE OR REPLACE TABLE BrightLight_TV AS(
+    SELECT      
+        V.user_id,
+        name,
+        surname,
+        COALESCE(gender, 'Unknown') AS Gender,
+        COALESCE(race, 'Unknown') AS Race,
+        email,
+        age,
+        COALESCE(province, 'Unknown') AS Province,
+        social_media_handle,
+        channel2 AS,
+        recorddate2,
+        recordtime2,
+        duration_2,
+
+        --- Convert hh:mm:ss to total_seconds
+        SPLIT_PART(duration_2, ':',1)::INT * 3600 +
+        SPLIT_PART(duration_2, ':',2)::INT * 60 +
+        SPLIT_PART(duration_2, ':',3)::INT AS Duration_seconds,
+
+        --- Use the formula above for watch_time
+        FLOOR(
+            (SPLIT_PART(duration_2, ':',1)::INT * 3600 +
+             SPLIT_PART(duration_2, ':',2)::INT * 60 +
+             SPLIT_PART(duration_2, ':',3)::INT) /60
+            ) ||'min' AS Watch_time
+    FROM USER_PROFILES AS U
+    FULL OUTER JOIN VIEWERSHIP AS V
+    ON U.userID = V.userID);
+
+SELECT * FROM BrightLight_TV;
+
+SELECT DISTINCT recorddate2 FROM BrightLight_TV 
+LIMIT 10;
+
+ALTER TABLE BrightLight_TV ADD COLUMN formatted_recorddate2 STRING;
+
+UPDATE BrightLight_TV
+SET formatted_recorddate2 = TO_CHAR(TO_DATE(recorddate2, 'DD/MM/YYYY'),'YYYY/MM/DD');
+
+FROM BrightLight_TV
+LIMIT 10;
+
+ALTER TABLE BrightLight_TV DROP COLUMN recorddate2;
+
+ALTER TABLE BrightLight_TV RENAME COLUMN formatted_recorddate2 TO recorddate2;
+
+SELECT * FROM BRIGHTLIGHT_TV;
+
+SELECT 
+    *,
+    CASE
+        WHEN recordtime2 BETWEEN '00:00:01' AND '04:00:00' THEN '12AM-4AM' 
+        WHEN recordtime2 BETWEEN '04:00:01' AND '08:00:00' THEN '4AM-8AM'
+        WHEN recordtime2 BETWEEN '12:00:01' AND '16:00:00' THEN '12PM-4PM'
+        WHEN recordtime2 BETWEEN '16:00:01' AND '20:00:00' THEN '4PM-8PM'
+        ELSE '8PM-12AM'
+    END AS Time_Slot,
+        CASE
+            WHEN age BETWEEN 0 AND 1 THEN 'Infancy'
+            WHEN age BETWEEN 2 AND 4 THEN 'Toddler'
+            WHEN age BETWEEN 5 AND 12 THEN 'Child'
+            WHEN age BETWEEN 13 AND 19 THEN 'Adolesence'
+            WHEN age BETWEEN 20 AND 39 THEN 'Young Adult'
+            WHEN age BETWEEN 40 AND 59 THEN 'Middle Adult'
+            ELSE 'Senior Citizen'
+        END AS Age_group,
+            CASE
+                WHEN TRY_TO_DATE(formatted_recorddate2,'YYYY/MM/DD')BETWEEN '2016-01-01' AND '2016-01-31' THEN 'JAN'
+                WHEN TRY_TO_DATE(formatted_recorddate2,'YYYY/MM/DD') BETWEEN '2016-02-01' AND '2016-02-29' THEN 'FEB'
+                WHEN TRY_TO_DATE(formatted_recorddate2,'YYYY/MM/DD') BETWEEN '2016-03-01' AND '2016-03-31' THEN 'MAR'
+                ELSE 'APR'
+            END AS Record_month
+FROM BrightLight_TV;
